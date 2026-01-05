@@ -3,28 +3,34 @@ import {
   boolean,
   foreignKey,
   json,
+  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uuid,
   varchar,
-  integer //// 新增：NextAuth OAuth所需类型
+  integer,
 } from "drizzle-orm/pg-core";
+import type { AppUsage } from "../usage"; 
+
+// =========================================================
+// 1. 用户与认证 (Casdoor / NextAuth 适配版)
+// =========================================================
 
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   email: varchar("email", { length: 64 }).notNull(),
   password: varchar("password", { length: 64 }),
-  name: varchar("name", { length: 255 }), // 新增：NextAuth适配器推荐的扩展字段
-  image: text("image"), // 新增：NextAuth适配器推荐的扩展字段
-  emailVerified: timestamp("emailVerified", { mode: "date" }), // 新增：NextAuth适配器推荐的扩展字段
-  role: varchar("role", { length: 64 }), // 新增：NextAuth适配器推荐的扩展字段
+  name: varchar("name", { length: 255 }),
+  image: text("image"), 
+  emailVerified: timestamp("emailVerified", { mode: "date" }), 
+  role: varchar("role", { length: 64 }), 
 });
 
 export type User = InferSelectModel<typeof user>;
 
-// 新增：NextAuth OAuth必需的表 - accounts
+// NextAuth OAuth - accounts 表
 export const accounts = pgTable(
   "account",
   {
@@ -49,7 +55,7 @@ export const accounts = pgTable(
   })
 );
 
-// 新增：NextAuth OAuth必需的表 - sessions
+// NextAuth OAuth - sessions 表
 export const sessions = pgTable("session", {
   sessionToken: varchar("sessionToken", { length: 255 }).primaryKey().notNull(),
   userId: uuid("userId")
@@ -58,7 +64,7 @@ export const sessions = pgTable("session", {
   expires: timestamp("expires", { mode: "date" }).notNull(),
 });
 
-// 新增：NextAuth OAuth必需的表 - verificationTokens
+// NextAuth OAuth - verificationTokens 表
 export const verificationTokens = pgTable(
   "verificationToken",
   {
@@ -71,8 +77,10 @@ export const verificationTokens = pgTable(
   })
 );
 
+// =========================================================
+// 2. 核心业务表 (Chat, Message, Document)
+// =========================================================
 
-// 以下为原有业务表，保持不变
 export const chat = pgTable("Chat", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
@@ -83,12 +91,14 @@ export const chat = pgTable("Chat", {
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),
+  
+  // ✅ 关键修复：补回了官方原版的字段，用于存储 Token 用量
+  lastContext: jsonb("lastContext").$type<AppUsage | null>(), 
 });
 
 export type Chat = InferSelectModel<typeof chat>;
 
-// DEPRECATED: The following schema is deprecated and will be removed in the future.
-// Read the migration guide at https://chat-sdk.dev/docs/migration-guides/message-parts
+// DEPRECATED: 旧版 Message 表 (保持兼容)
 export const messageDeprecated = pgTable("Message", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   chatId: uuid("chatId")
@@ -101,6 +111,7 @@ export const messageDeprecated = pgTable("Message", {
 
 export type MessageDeprecated = InferSelectModel<typeof messageDeprecated>;
 
+// 新版 Message 表
 export const message = pgTable("Message_v2", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   chatId: uuid("chatId")
@@ -114,8 +125,7 @@ export const message = pgTable("Message_v2", {
 
 export type DBMessage = InferSelectModel<typeof message>;
 
-// DEPRECATED: The following schema is deprecated and will be removed in the future.
-// Read the migration guide at https://chat-sdk.dev/docs/migration-guides/message-parts
+// DEPRECATED: 旧版 Vote 表
 export const voteDeprecated = pgTable(
   "Vote",
   {
@@ -136,6 +146,7 @@ export const voteDeprecated = pgTable(
 
 export type VoteDeprecated = InferSelectModel<typeof voteDeprecated>;
 
+// 新版 Vote 表
 export const vote = pgTable(
   "Vote_v2",
   {
@@ -156,6 +167,7 @@ export const vote = pgTable(
 
 export type Vote = InferSelectModel<typeof vote>;
 
+// Document 表
 export const document = pgTable(
   "Document",
   {
@@ -179,6 +191,7 @@ export const document = pgTable(
 
 export type Document = InferSelectModel<typeof document>;
 
+// Suggestion 表
 export const suggestion = pgTable(
   "Suggestion",
   {
@@ -205,6 +218,7 @@ export const suggestion = pgTable(
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
 
+// Stream 表 (用于流式传输恢复)
 export const stream = pgTable(
   "Stream",
   {

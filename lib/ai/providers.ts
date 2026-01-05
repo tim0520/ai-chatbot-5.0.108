@@ -1,5 +1,5 @@
 import { gateway } from "@ai-sdk/gateway";
-import { deepseek } from "@ai-sdk/deepseek";
+import { createOpenAI } from "@ai-sdk/openai";
 import {
   customProvider,
   extractReasoningMiddleware,
@@ -9,15 +9,38 @@ import { isTestEnvironment } from "../constants";
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
 
-const getModelProvider = (modelId: string) => {
-  if (modelId.startsWith("deepseek/")) {
-    return deepseek(modelId.replace("deepseek/", ""));
+// 定义一个通用的 Fetch Patch 函数 (用于修复 openai o1版本后 developer 角色报错)
+const patchFetchRole = async (url: any, options: any) => {
+  if (options && options.body && typeof options.body === 'string') {
+    // 很多国产大模型都不支持 "developer" 角色，强制替换为 "system"
+    if (options.body.includes('"role":"developer"')) {
+      options.body = options.body.replace(/"role":"developer"/g, '"role":"system"');
+    }
   }
-  
-  // 默认回退 (Fallback) 到 DeepSeek
-  return deepseek("deepseek-chat");
+  return fetch(url, options);
 };
 
+// ---------------------------------------------------------
+// 1. 初始化 DeepSeek (直连)
+// ---------------------------------------------------------
+const deepseek = createOpenAI({
+  name: 'deepseek',
+  baseURL: 'https://api.deepseek.com/v1',
+  apiKey: process.env.DEEPSEEK_API_KEY ?? '',
+  fetch: patchFetchRole, // 使用通用补丁
+});
+
+// ---------------------------------------------------------
+// 2. ✅ 新增: 初始化 Qwen (通义千问 - 阿里云直连)
+// ---------------------------------------------------------
+const qwen = createOpenAI({
+  name: 'qwen',
+  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', 
+  apiKey: process.env.QWEN_API_KEY ?? '',
+  fetch: patchFetchRole, 
+});
+
+// Mock Provider (测试环境用)
 export const myProvider = isTestEnvironment
   ? (() => {
       const {
@@ -37,39 +60,53 @@ export const myProvider = isTestEnvironment
     })()
   : null;
 
+// 核心路由逻辑
 export function getLanguageModel(modelId: string) {
+  // A. 测试环境拦截
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel(modelId);
   }
 
+  // B. DeepSeek 路由
+  if (modelId.startsWith("deepseek/")) {
+    const cleanId = modelId.replace("deepseek/", "");
+    return deepseek.chat(cleanId);
+  }
+
+  // C.Qwen 路由
+  if (modelId.startsWith("qwen/")) {
+    const cleanId = modelId.replace("qwen/", "");
+    return qwen.chat(cleanId);
+  }
+
+  // D. 官方原有逻辑 (走 Vercel AI Gateway)
   const isReasoningModel =
     modelId.includes("reasoning") || modelId.endsWith("-thinking");
 
-  const baseModel = getModelProvider(
-    isReasoningModel ? modelId.replace(THINKING_SUFFIX_REGEX, "") : modelId
-  );  
   if (isReasoningModel) {
-    //const gatewayModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
+    const gatewayModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
 
     return wrapLanguageModel({
-      model: baseModel as any,
+      model: gateway.languageModel(gatewayModelId),
       middleware: extractReasoningMiddleware({ tagName: "thinking" }),
     });
   }
 
-  return baseModel;//gateway.languageModel(modelId);
+  return gateway.languageModel(modelId);
 }
 
+// 辅助模型 (你可以按需改成 qwen)
 export function getTitleModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("title-model");
   }
-  return deepseek("deepseek-chat");//gateway.languageModel("anthropic/claude-haiku-4.5");
+  // 用 DeepSeek 生成标题比较便宜且快 deepseek.chat("deepseek-chat")，当然你也可以改成 qwen.chat("qwen-turbo")
+  return qwen.chat("qwen-plus");
 }
 
 export function getArtifactModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("artifact-model");
   }
-  return deepseek("deepseek-chat");//gateway.languageModel("anthropic/claude-haiku-4.5");
+  return qwen.chat("qwen-plus");
 }

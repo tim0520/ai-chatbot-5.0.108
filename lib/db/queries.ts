@@ -17,6 +17,7 @@ import postgres from "postgres";
 import type { ArtifactKind } from "@/components/artifact";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { ChatSDKError } from "../errors";
+import type { AppUsage } from "../usage";
 import { generateUUID } from "../utils";
 import {
   type Chat,
@@ -31,14 +32,56 @@ import {
   user,
   vote,
 } from "./schema";
+import { generateHashedPassword } from "./utils";
 
-// biome-ignore lint: Forbidden non-null assertion.
 const client = postgres(process.env.POSTGRES_URL!);
 const db = drizzle(client);
 
-// ============================================
-// 业务函数
-// ============================================
+// ==============================================================================
+// 🟢 区域 1：用户认证 (User Auth) - CASDOOR 关注区
+// ==============================================================================
+
+export async function getUser(email: string): Promise<User[]> {
+  try {
+    return await db.select().from(user).where(eq(user.email, email));
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to get user by email"
+    );
+  }
+}
+
+export async function createUser(email: string, password: string) {
+  const hashedPassword = generateHashedPassword(password);
+
+  try {
+    return await db.insert(user).values({ email, password: hashedPassword });
+  } catch (_error) {
+    throw new ChatSDKError("bad_request:database", "Failed to create user");
+  }
+}
+
+export async function createGuestUser() {
+  const email = `guest-${Date.now()}`;
+  const password = generateHashedPassword(generateUUID());
+
+  try {
+    return await db.insert(user).values({ email, password }).returning({
+      id: user.id,
+      email: user.email,
+    });
+  } catch (_error) {
+    throw new ChatSDKError(
+      "bad_request:database",
+      "Failed to create guest user"
+    );
+  }
+}
+
+// ==============================================================================
+// 🔵 区域 2：聊天核心逻辑 (Chat Core) 
+// ==============================================================================
 
 export async function saveChat({
   id,
@@ -190,20 +233,15 @@ export async function getChatsByUserId({
   }
 }
 
-// ✅ 核心修改点：getChatById
 export async function getChatById({ id }: { id: string }) {
   try {
     const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
-    return selectedChat;
-  } catch (error: any) {
-    // ✅ 修复：捕获无效 UUID 格式错误 (Postgres Code 22P02)
-    // 如果传入 "123" 这种非 UUID 字符串，直接返回 null，不抛出异常
-    if (error?.code === '22P02') {
-      console.warn(`[DB] Invalid UUID format provided: ${id}`);
-      return undefined; // 或者 return null
+    if (!selectedChat) {
+      return null;
     }
 
-    console.error("[DB] Failed to get chat by id:", error);
+    return selectedChat;
+  } catch (_error) {
     throw new ChatSDKError("bad_request:database", "Failed to get chat by id");
   }
 }
@@ -482,6 +520,26 @@ export async function updateChatTitleById({
   }
 }
 
+// ✅ 必须保留：route.ts 用它来记录 Token 统计
+export async function updateChatLastContextById({
+  chatId,
+  context,
+}: {
+  chatId: string;
+  // Store merged server-enriched usage object
+  context: AppUsage;
+}) {
+  try {
+    return await db
+      .update(chat)
+      .set({ lastContext: context })
+      .where(eq(chat.id, chatId));
+  } catch (error) {
+    console.warn("Failed to update lastContext for chat", chatId, error);
+    return;
+  }
+}
+
 export async function getMessageCountByUserId({
   id,
   differenceInHours,
@@ -545,15 +603,7 @@ export async function getStreamIdsByChatId({ chatId }: { chatId: string }) {
       .execute();
 
     return streamIds.map(({ id }) => id);
-  } catch (error) {
-    // ✅ 新增：打印详细的数据库错误
-    console.error("❌ [DB Error] Failed to save chat. Details:", error);
-    // @ts-ignore
-    if (error.code === '23503') { 
-        console.error("⚠️ User ID mismatch: Current User ID does not exist in the database.");
-    }
-
-    throw new ChatSDKError("bad_request:database", "Failed to save chat");
+  } catch (_error) {
     throw new ChatSDKError(
       "bad_request:database",
       "Failed to get stream ids by chat id"

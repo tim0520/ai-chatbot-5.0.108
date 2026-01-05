@@ -1,5 +1,5 @@
 // Curated list of top models from Vercel AI Gateway
-export const DEFAULT_CHAT_MODEL = "google/gemini-2.5-flash-lite";
+export const DEFAULT_CHAT_MODEL = "qwen/qwen-plus";
 
 export type ChatModel = {
   id: string;
@@ -78,14 +78,26 @@ export const chatModels: ChatModel[] = [
   {
     id: "deepseek/deepseek-chat", // 我们自定义的 ID 格式：provider/model-name
     name: "DeepSeek V3",
-    provider: "DeepSeek",
+    provider: "deepseek",
     description: "DeepSeek V3 - Intelligent and fast",
   },
   {
     id: "deepseek/deepseek-reasoner",
     name: "DeepSeek R1 (Reasoner)",
-    provider: "DeepSeek",
+    provider: "deepseek",
     description: "DeepSeek R1 - Strong reasoning capabilities",
+  },
+  {
+    id: 'qwen/qwen-max', // 这个 ID 前缀 "qwen/" 要和 providers.ts 里的判断一致
+    name: 'Qwen Max',
+    provider: "qwen",
+    description: 'Tongyi Qianwen Max (Aliyun)',
+  },
+  {
+    id: 'qwen/qwen-plus',
+    name: 'Qwen Plus',
+    provider: "qwen",
+    description: 'Tongyi Qianwen Plus (Aliyun)',
   },
 ];
 
