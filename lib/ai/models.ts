@@ -74,6 +74,19 @@ export const chatModels: ChatModel[] = [
     provider: "reasoning",
     description: "Reasoning optimized for code",
   },
+  // ✅ 新增：DeepSeek 模型
+  {
+    id: "deepseek/deepseek-chat", // 我们自定义的 ID 格式：provider/model-name
+    name: "DeepSeek V3",
+    provider: "DeepSeek",
+    description: "DeepSeek V3 - Intelligent and fast",
+  },
+  {
+    id: "deepseek/deepseek-reasoner",
+    name: "DeepSeek R1 (Reasoner)",
+    provider: "DeepSeek",
+    description: "DeepSeek R1 - Strong reasoning capabilities",
+  },
 ];
 
 // Group models by provider for UI

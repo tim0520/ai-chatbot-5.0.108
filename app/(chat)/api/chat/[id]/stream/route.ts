@@ -34,7 +34,7 @@ export async function GET(
     return new ChatSDKError("unauthorized:chat").toResponse();
   }
 
-  let chat: Chat | null;
+  let chat: Chat | null | undefined;
 
   try {
     chat = await getChatById({ id: chatId });

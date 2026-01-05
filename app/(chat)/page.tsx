@@ -19,13 +19,15 @@ async function NewChatPage() {
   const session = await auth();
 
   if (!session) {
-    redirect("/api/auth/guest");
+    redirect("/api/auth/guest"); 
   }
 
   const id = generateUUID();
 
   const cookieStore = await cookies();
   const modelIdFromCookie = cookieStore.get("chat-model");
+  // ✅ 获取 isGuest 状态
+  const isGuest = session.user?.type === "guest";
 
   if (!modelIdFromCookie) {
     return (
@@ -37,6 +39,7 @@ async function NewChatPage() {
           initialMessages={[]}
           initialVisibilityType="private"
           isReadonly={false}
+          isGuest={isGuest} // ✅ 传入
           key={id}
         />
         <DataStreamHandler />
@@ -53,6 +56,7 @@ async function NewChatPage() {
         initialMessages={[]}
         initialVisibilityType="private"
         isReadonly={false}
+        isGuest={isGuest} // ✅ 传入
         key={id}
       />
       <DataStreamHandler />

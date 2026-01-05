@@ -3,24 +3,76 @@ import {
   boolean,
   foreignKey,
   json,
-  jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
   uuid,
   varchar,
+  integer //// 新增：NextAuth OAuth所需类型
 } from "drizzle-orm/pg-core";
-import type { AppUsage } from "../usage";
 
 export const user = pgTable("User", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   email: varchar("email", { length: 64 }).notNull(),
   password: varchar("password", { length: 64 }),
+  name: varchar("name", { length: 255 }), // 新增：NextAuth适配器推荐的扩展字段
+  image: text("image"), // 新增：NextAuth适配器推荐的扩展字段
+  emailVerified: timestamp("emailVerified", { mode: "date" }), // 新增：NextAuth适配器推荐的扩展字段
+  role: varchar("role", { length: 64 }), // 新增：NextAuth适配器推荐的扩展字段
 });
 
 export type User = InferSelectModel<typeof user>;
 
+// 新增：NextAuth OAuth必需的表 - accounts
+export const accounts = pgTable(
+  "account",
+  {
+    userId: uuid("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 255 }).notNull(),
+    provider: varchar("provider", { length: 255 }).notNull(),
+    providerAccountId: varchar("providerAccountId", { length: 255 }).notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: varchar("token_type", { length: 255 }),
+    scope: varchar("scope", { length: 255 }),
+    id_token: text("id_token"),
+    session_state: varchar("session_state", { length: 255 }),
+  },
+  (account) => ({
+    compositePk: primaryKey({
+      columns: [account.provider, account.providerAccountId],
+    }),
+  })
+);
+
+// 新增：NextAuth OAuth必需的表 - sessions
+export const sessions = pgTable("session", {
+  sessionToken: varchar("sessionToken", { length: 255 }).primaryKey().notNull(),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  expires: timestamp("expires", { mode: "date" }).notNull(),
+});
+
+// 新增：NextAuth OAuth必需的表 - verificationTokens
+export const verificationTokens = pgTable(
+  "verificationToken",
+  {
+    identifier: varchar("identifier", { length: 255 }).notNull(),
+    token: varchar("token", { length: 255 }).notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (vt) => ({
+    compositePk: primaryKey({ columns: [vt.identifier, vt.token] }),
+  })
+);
+
+
+// 以下为原有业务表，保持不变
 export const chat = pgTable("Chat", {
   id: uuid("id").primaryKey().notNull().defaultRandom(),
   createdAt: timestamp("createdAt").notNull(),
@@ -31,7 +83,6 @@ export const chat = pgTable("Chat", {
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),
-  lastContext: jsonb("lastContext").$type<AppUsage | null>(),
 });
 
 export type Chat = InferSelectModel<typeof chat>;

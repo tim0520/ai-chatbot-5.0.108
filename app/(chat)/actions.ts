@@ -23,7 +23,7 @@ export async function generateTitleFromUserMessage({
   message: UIMessage;
 }) {
   const { text: title } = await generateText({
-    model: getTitleModel(),
+    model: getTitleModel() as any,
     system: titlePrompt,
     prompt: getTextFromMessage(message),
   });

@@ -1,4 +1,5 @@
 import { gateway } from "@ai-sdk/gateway";
+import { deepseek } from "@ai-sdk/deepseek";
 import {
   customProvider,
   extractReasoningMiddleware,
@@ -7,6 +8,15 @@ import {
 import { isTestEnvironment } from "../constants";
 
 const THINKING_SUFFIX_REGEX = /-thinking$/;
+
+const getModelProvider = (modelId: string) => {
+  if (modelId.startsWith("deepseek/")) {
+    return deepseek(modelId.replace("deepseek/", ""));
+  }
+  
+  // 默认回退 (Fallback) 到 DeepSeek
+  return deepseek("deepseek-chat");
+};
 
 export const myProvider = isTestEnvironment
   ? (() => {
@@ -35,28 +45,31 @@ export function getLanguageModel(modelId: string) {
   const isReasoningModel =
     modelId.includes("reasoning") || modelId.endsWith("-thinking");
 
+  const baseModel = getModelProvider(
+    isReasoningModel ? modelId.replace(THINKING_SUFFIX_REGEX, "") : modelId
+  );  
   if (isReasoningModel) {
-    const gatewayModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
+    //const gatewayModelId = modelId.replace(THINKING_SUFFIX_REGEX, "");
 
     return wrapLanguageModel({
-      model: gateway.languageModel(gatewayModelId),
+      model: baseModel as any,
       middleware: extractReasoningMiddleware({ tagName: "thinking" }),
     });
   }
 
-  return gateway.languageModel(modelId);
+  return baseModel;//gateway.languageModel(modelId);
 }
 
 export function getTitleModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("title-model");
   }
-  return gateway.languageModel("anthropic/claude-haiku-4.5");
+  return deepseek("deepseek-chat");//gateway.languageModel("anthropic/claude-haiku-4.5");
 }
 
 export function getArtifactModel() {
   if (isTestEnvironment && myProvider) {
     return myProvider.languageModel("artifact-model");
   }
-  return gateway.languageModel("anthropic/claude-haiku-4.5");
+  return deepseek("deepseek-chat");//gateway.languageModel("anthropic/claude-haiku-4.5");
 }

@@ -23,7 +23,6 @@ import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import type { Vote } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
-import type { AppUsage } from "@/lib/usage";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
@@ -40,7 +39,7 @@ export function Chat({
   initialVisibilityType,
   isReadonly,
   autoResume,
-  initialLastContext,
+  isGuest = false, // ✅ 1. 新增：接收 isGuest 参数，默认为 false
 }: {
   id: string;
   initialMessages: ChatMessage[];
@@ -48,7 +47,7 @@ export function Chat({
   initialVisibilityType: VisibilityType;
   isReadonly: boolean;
   autoResume: boolean;
-  initialLastContext?: AppUsage;
+  isGuest?: boolean; // ✅ 2. 新增：类型定义
 }) {
   const router = useRouter();
 
@@ -72,7 +71,6 @@ export function Chat({
   const { setDataStream } = useDataStream();
 
   const [input, setInput] = useState<string>("");
-  const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   const currentModelIdRef = useRef(currentModelId);
@@ -111,9 +109,6 @@ export function Chat({
     }),
     onData: (dataPart) => {
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
-      if (dataPart.type === "data-usage") {
-        setUsage(dataPart.data);
-      }
     },
     onFinish: () => {
       mutate(unstable_serialize(getChatHistoryPaginationKey));
@@ -135,6 +130,21 @@ export function Chat({
     },
   });
 
+  // ✅ 3. 新增：拦截发送函数
+  // 如果是游客，阻止发送并跳转登录；否则调用原始 sendMessage
+  const handleSendMessage = async (...args: Parameters<typeof sendMessage>) => {
+    if (isGuest) {
+      toast({
+        type: "error", // 或者使用 "info"
+        description: "Please sign in to continue chatting.",
+      });
+      router.push("/login");
+      return;
+    }
+    // 正常发送
+    return sendMessage(...args);
+  };
+
   const searchParams = useSearchParams();
   const query = searchParams.get("query");
 
@@ -142,15 +152,21 @@ export function Chat({
 
   useEffect(() => {
     if (query && !hasAppendedQuery) {
-      sendMessage({
-        role: "user" as const,
-        parts: [{ type: "text", text: query }],
-      });
-
-      setHasAppendedQuery(true);
-      window.history.replaceState({}, "", `/chat/${id}`);
+      // 注意：这里如果是 URL 带 query 参数进来的（比如从首页搜索框），
+      // 也应该应用 Guest 拦截逻辑。
+      if (isGuest) {
+         // 如果是游客带 query 进来，暂时不做处理，或者也可以选择直接跳转
+         // 这里保持现状，通常 URL query 是为了方便分享
+      } else {
+        sendMessage({
+          role: "user" as const,
+          parts: [{ type: "text", text: query }],
+        });
+        setHasAppendedQuery(true);
+        window.history.replaceState({}, "", `/chat/${id}`);
+      }
     }
-  }, [query, sendMessage, hasAppendedQuery, id]);
+  }, [query, sendMessage, hasAppendedQuery, id, isGuest]);
 
   const { data: votes } = useSWR<Vote[]>(
     messages.length >= 2 ? `/api/vote?chatId=${id}` : null,
@@ -198,13 +214,12 @@ export function Chat({
               onModelChange={setCurrentModelId}
               selectedModelId={currentModelId}
               selectedVisibilityType={visibilityType}
-              sendMessage={sendMessage}
+              sendMessage={handleSendMessage} // ✅ 4. 替换：使用 handleSendMessage
               setAttachments={setAttachments}
               setInput={setInput}
               setMessages={setMessages}
               status={status}
               stop={stop}
-              usage={usage}
             />
           )}
         </div>
@@ -219,7 +234,7 @@ export function Chat({
         regenerate={regenerate}
         selectedModelId={currentModelId}
         selectedVisibilityType={visibilityType}
-        sendMessage={sendMessage}
+        sendMessage={handleSendMessage} // ✅ 5. 替换：使用 handleSendMessage
         setAttachments={setAttachments}
         setInput={setInput}
         setMessages={setMessages}
