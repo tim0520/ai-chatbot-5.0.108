@@ -283,6 +283,20 @@ export function Weather({
 }: {
   weatherAtLocation?: WeatherAtLocation;
 }) {
+  // 如果没有数据，或者数据结构里没有 hourly/current 字段，直接不渲染或显示错误
+  if (
+    !weatherAtLocation ||
+    !weatherAtLocation.hourly ||
+    !weatherAtLocation.hourly.temperature_2m ||
+    !weatherAtLocation.current
+  ) {
+    console.error("Invalid weather data:", weatherAtLocation);
+    return (
+      <div className="p-4 text-red-500 bg-red-50 rounded-lg text-sm">
+        Weather data currently unavailable.
+      </div>
+    );
+  }
   const currentHigh = Math.max(
     ...weatherAtLocation.hourly.temperature_2m.slice(0, 24)
   );

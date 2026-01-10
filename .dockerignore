@@ -1,0 +1,23 @@
+# 1. 巨大的依赖包 (必须忽略，容器内会重新安装)
+node_modules
+.pnpm-store
+
+# 2. 本地构建产物 (必须忽略，容器内会重新构建)
+.next
+dist
+build
+
+# 3. 敏感文件 (严禁打包进镜像)
+.env
+.env.*
+.git
+.gitignore
+*.md
+
+# 4. 数据目录
+data
+s3_data
+
+# 5. Docker 自身配置
+Dockerfile
+docker-compose.yml

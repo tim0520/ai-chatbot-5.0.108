@@ -153,10 +153,10 @@ export async function POST(request: Request) {
     const { longitude, latitude, city, country } = geolocation(request);
 
     const requestHints: RequestHints = {
-      longitude,
-      latitude,
-      city,
-      country,
+      longitude: longitude || '121.4737',
+      latitude: latitude || '31.2304',
+      city: city || 'Shanghai',
+      country: country || 'CN',
     };
 
     await saveMessages({

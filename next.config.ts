@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
       // ✅ 修复 1: Casdoor 远程服务器 (头像用)
       {
         protocol: "http",
-        hostname: "47.117.47.58", // 只能填 IP，不能带 http://
+        hostname: "127.0.0.1", // 只能填 IP，不能带 http://
         port: "8000",             // 端口在这里填
       },
       // ✅ 修复 2: 本地调试用
@@ -33,7 +33,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/casdoor-api/:path*',
-        destination: 'http://47.117.47.58:8000/api/:path*',
+        destination: 'http://127.0.0.1:8000/api/:path*',
       },
     ];
   },

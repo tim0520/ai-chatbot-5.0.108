@@ -42,3 +42,7 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /playwright/*
+
+
+data/
+s3_data/

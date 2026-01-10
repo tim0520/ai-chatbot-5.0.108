@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "next-dev": "next dev --turbo",
-    "dev": "concurrently \"node local-proxy.js\" \"pnpm next-dev\" --names \"PROXY,NEXT\" --prefix-colors \"yellow,blue\"",
+    "dev": "next dev --turbo -p 3005",
     "build": "tsx lib/db/migrate && next build",
-    "start": "next start",
+    "start": "next start -p 3005",
     "lint": "npx ultracite@latest check",
     "format": "npx ultracite@latest fix",
     "db:generate": "drizzle-kit generate",
